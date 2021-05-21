@@ -1,7 +1,10 @@
-const router = require('express').Router();
-
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+const bcrypt = require("bcryptjs");
+const buildToken = require("./token-builder");
+const router = require("express").Router();
+const Jokes = require("../jokes/jokes-data");
+const bodyHasContent = require("./bodyHasContent");
+const Users = require("../users/users-model");
+router.post("/register", bodyHasContent, (req, res) => {
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -27,10 +30,30 @@ router.post('/register', (req, res) => {
     4- On FAILED registration due to the `username` being taken,
       the response body should include a string exactly as follows: "username taken".
   */
+  let user = req.body;
+
+  // bcrypting the password before saving
+  const rounds = process.env.BCRYPT_ROUNDS || 8; // 2 ^ 8
+  const hash = bcrypt.hashSync(user.password, rounds);
+
+  // never save the plain text password in the db
+  user.password = hash;
+
+  Users.add(user)
+    .then((saved) => {
+      res.status(201).json({
+        id: saved.id,
+        username: saved.username,
+        password: saved.password,
+      });
+    })
+    .catch((err) => {
+      res.status(400).json({ message: "username taken" });
+    }); // our custom err handling middleware in server.js will trap this
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post("/login", (req, res) => {
+  res.end("implement login, please!");
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -54,6 +77,25 @@ router.post('/login', (req, res) => {
     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
       the response body should include a string exactly as follows: "invalid credentials".
   */
+  let { username, password } = req.body;
+
+  Users.findBy({ username }) // it would be nice to have middleware do this
+    .then(([user]) => {
+      if (user && bcrypt.compareSync(password, user.password)) {
+        const token = buildToken(user);
+        res.status(200).json({
+          message: `Welcome back ${user.username}!`,
+          token,
+        });
+      } else {
+        res.status(401).json({ message: "Invalid Credentials" });
+      }
+    })
+    .catch((err) =>
+      res.status(400).json({
+        message: "User not found",
+      })
+    );
 });
 
 module.exports = router;

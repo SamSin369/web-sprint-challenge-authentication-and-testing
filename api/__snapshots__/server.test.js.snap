@@ -1,0 +1,3 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`[GET] /jokes returns a list of jokes 1`] = `Object {}`;
